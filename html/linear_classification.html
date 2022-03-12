@@ -1,0 +1,329 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>linear_classification</title><meta name="generator" content="MATLAB 9.10"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2021-08-26"><meta name="DC.source" content="linear_classification.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h2>Contents</h2><div><ul><li><a href="#2">Declare audio and experiment parameters</a></li><li><a href="#3">Getting reference DC component from FFT</a></li><li><a href="#4">Compute alpha and beta bandpower for each of the 36 trials</a></li><li><a href="#5">Plotting bandpower of each trial</a></li><li><a href="#6">Find cross-validated accuracy</a></li><li><a href="#7">Plotting bandpower for held-in and held-out trials</a></li><li><a href="#8">Getting indices of two consecutive pairs of each state</a></li><li><a href="#9">Plotting last two consecutive pairs of each state</a></li></ul></div><pre class="codeinput">clear; close <span class="string">all</span>; clc       <span class="comment">% Tidy up</span>
+</pre><h2 id="2">Declare audio and experiment parameters</h2><pre class="codeinput">audio_length = 180;                 <span class="comment">% Length of recording [s]</span>
+Fs = 10e3;                          <span class="comment">% Sampling frequency [Hz]</span>
+Tint = 5;                           <span class="comment">% Interval of eyes open/closed [s]</span>
+num_samples = audio_length * Fs;    <span class="comment">% Number of samples from data</span>
+
+signal = audioread(<span class="string">"05_08_2021.wav"</span>, [1 num_samples]);
+</pre><h2 id="3">Getting reference DC component from FFT</h2><pre class="codeinput">Fsig = fft(signal) / length(signal);
+aFsig = abs(Fsig);     <span class="comment">% get amplitude of fft</span>
+p_spectrum = aFsig.^2; <span class="comment">% two-sided power spectrum</span>
+p_spectrum = p_spectrum(1:floor(length(Fsig)/2));
+p_spectrum(2:end) = 2*p_spectrum(2:end); <span class="comment">% one-sided power spectrum</span>
+pow_ref = p_spectrum(1);
+</pre><h2 id="4">Compute alpha and beta bandpower for each of the 36 trials</h2><pre class="codeinput">num_trials = audio_length/Tint;
+trial_length = length(signal)/num_trials;
+time = linspace(0, Tint, trial_length);
+
+pow_a = zeros(num_trials, 1);
+pow_b = zeros(num_trials, 1);
+
+<span class="keyword">for</span> n=1:num_trials
+    <span class="comment">% Get bandpower for each of the 36 trials</span>
+    nstart = (n-1)*trial_length+1;
+    nstop = n*trial_length;
+
+    trial_data = signal(nstart:nstop);
+    [pow_a(n), pow_b(n)] = trialBandpower(trial_data, pow_ref);
+<span class="keyword">end</span>
+</pre><h2 id="5">Plotting bandpower of each trial</h2><pre class="codeinput">states = [<span class="string">"Eyes closed"</span>, <span class="string">"Eyes open"</span>];
+groups = repmat(states, 1, num_trials/length(states))';
+
+figure
+gscatter(pow_a, pow_b, groups, <span class="string">'br'</span>, <span class="string">'o'</span>)
+xlabel(<span class="string">'Mean alpha band power (dB/Hz rel. DC)'</span>)
+ylabel(<span class="string">'Mean beta band power (dB/Hz rel. DC)'</span>)
+title(<span class="string">"Mean power for Alpha vs. Beta bands"</span>);
+
+<span class="comment">% Setting axis limits</span>
+ax_range = round([min(pow_a) max(pow_a) min(pow_b) max(pow_b)]);
+ax_range([1 3]) = ax_range([1 3]) - 1;
+ax_range([2 4]) = ax_range([2 4]) + 1;
+axis(ax_range)
+</pre><h2 id="6">Find cross-validated accuracy</h2><pre class="codeinput">num_held = 2;
+num_folds = num_trials / num_held;
+correct = zeros(num_folds, 1);
+
+<span class="comment">% Get start indices of each held out fold for testing</span>
+start_idx = (num_trials - num_held + 1):-num_held:1;
+
+<span class="comment">% Create feature matrix containing bandpowers</span>
+features = [pow_a pow_b];
+
+
+<span class="keyword">for</span> k = 1:num_folds
+    held_out = start_idx(k):start_idx(k)+num_held-1;
+    held_in=[1:(start_idx(k)-1) start_idx(k)+num_held:num_trials];
+
+    [class,~,~,~,coeff] = classify(features(held_out,:), <span class="keyword">...</span>
+                                   features(held_in, :), <span class="keyword">...</span>
+                                   groups(held_in), <span class="string">'linear'</span>);
+
+    actual_states = groups(held_out);
+
+    <span class="comment">% Store number of correctly classified trials in each fold</span>
+    correct(k) = sum(actual_states==class);
+<span class="keyword">end</span>
+
+total_correct = sum(correct)
+DA = total_correct/num_trials * 100
+</pre><h2 id="7">Plotting bandpower for held-in and held-out trials</h2><pre class="codeinput">figure
+hold <span class="string">on</span>
+
+<span class="comment">% Specify fold number to plot</span>
+fold_num = 17;
+held_out = start_idx(fold_num):start_idx(fold_num)+num_held-1;
+held_in=[1:(start_idx(fold_num)-1) start_idx(fold_num)+num_held:num_trials];
+
+gscatter(pow_a(held_out), pow_b(held_out), groups(held_out), <span class="string">'br'</span>)
+gscatter(pow_a(held_in), pow_b(held_in), groups(held_in), <span class="string">'br'</span>, <span class="string">'o'</span>)
+K = coeff(1,2).const;
+L = coeff(1,2).linear;
+f = @(x,y) K+L(1)*x + L(2)*y;
+h = fimplicit(f);
+set(h,<span class="string">'DisplayName'</span>,<span class="string">'Decision Boundary'</span>, <span class="string">'LineStyle'</span>,<span class="string">'--'</span>, <span class="string">'Color'</span>, <span class="string">'k'</span>);
+
+xlabel(<span class="string">'Mean alpha band power (dB/Hz rel. DC)'</span>)
+ylabel(<span class="string">'Mean beta band power (dB/Hz rel. DC)'</span>)
+title(<span class="string">"Mean power for Alpha vs. Beta bands (LDA Classifier)"</span>);
+axis(ax_range)
+</pre><h2 id="8">Getting indices of two consecutive pairs of each state</h2><pre class="codeinput">trial_num = 1;          <span class="comment">% Trial number for pair (1 to 18)</span>
+
+n = trial_num*2 - 1;    <span class="comment">% Get trial number for "eyes closed" state</span>
+nstart = (n-1)*trial_length+1;
+nstop = n*trial_length;
+
+closed_trial = signal(nstart:nstop);
+open_trial = signal((nstart:nstop) + trial_length);
+</pre><h2 id="9">Plotting last two consecutive pairs of each state</h2><pre class="codeinput">figure
+subplot(2,1,1)
+
+plot(time, closed_trial)
+yline(rms(closed_trial), <span class="string">'r--'</span>)
+xlabel(<span class="string">'Time (s)'</span>)
+ylabel(<span class="string">'Voltage (&micro;V)'</span>)
+title(<span class="string">'Electrode voltage vs. time for eyes closed segment'</span>)
+legend(<span class="string">'Electrode voltage'</span>, <span class="string">'RMS voltage'</span>)
+axis([0 Tint min(signal) max(signal)])
+
+subplot(2,1,2)
+plot(time, open_trial)
+yline(rms(open_trial), <span class="string">'r--'</span>)
+xlabel(<span class="string">'Time (s)'</span>)
+ylabel(<span class="string">'Voltage (&micro;V)'</span>)
+title(<span class="string">'Electrode voltage vs. time for eyes open segment'</span>)
+legend(<span class="string">'Electrode voltage'</span>, <span class="string">'RMS voltage'</span>)
+axis([0 Tint min(signal) max(signal)])
+</pre><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2021a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+clear; close all; clc       % Tidy up
+
+%% Declare audio and experiment parameters
+audio_length = 180;                 % Length of recording [s]
+Fs = 10e3;                          % Sampling frequency [Hz]
+Tint = 5;                           % Interval of eyes open/closed [s]
+num_samples = audio_length * Fs;    % Number of samples from data
+
+signal = audioread("05_08_2021.wav", [1 num_samples]);
+
+%% Getting reference DC component from FFT
+
+Fsig = fft(signal) / length(signal);
+aFsig = abs(Fsig);     % get amplitude of fft
+p_spectrum = aFsig.^2; % two-sided power spectrum
+p_spectrum = p_spectrum(1:floor(length(Fsig)/2));
+p_spectrum(2:end) = 2*p_spectrum(2:end); % one-sided power spectrum
+pow_ref = p_spectrum(1);
+
+%% Compute alpha and beta bandpower for each of the 36 trials
+
+num_trials = audio_length/Tint;
+trial_length = length(signal)/num_trials;
+time = linspace(0, Tint, trial_length);
+
+pow_a = zeros(num_trials, 1);
+pow_b = zeros(num_trials, 1);
+
+for n=1:num_trials
+    % Get bandpower for each of the 36 trials
+    nstart = (n-1)*trial_length+1;
+    nstop = n*trial_length;
+    
+    trial_data = signal(nstart:nstop);
+    [pow_a(n), pow_b(n)] = trialBandpower(trial_data, pow_ref);
+end
+
+%% Plotting bandpower of each trial
+
+states = ["Eyes closed", "Eyes open"];
+groups = repmat(states, 1, num_trials/length(states))';
+
+figure
+gscatter(pow_a, pow_b, groups, 'br', 'o')
+xlabel('Mean alpha band power (dB/Hz rel. DC)')
+ylabel('Mean beta band power (dB/Hz rel. DC)')
+title("Mean power for Alpha vs. Beta bands");
+
+% Setting axis limits
+ax_range = round([min(pow_a) max(pow_a) min(pow_b) max(pow_b)]);
+ax_range([1 3]) = ax_range([1 3]) - 1;
+ax_range([2 4]) = ax_range([2 4]) + 1;
+axis(ax_range)
+
+%% Find cross-validated accuracy
+
+num_held = 2;
+num_folds = num_trials / num_held;
+correct = zeros(num_folds, 1);
+
+% Get start indices of each held out fold for testing
+start_idx = (num_trials - num_held + 1):-num_held:1;
+
+% Create feature matrix containing bandpowers
+features = [pow_a pow_b];
+
+
+for k = 1:num_folds
+    held_out = start_idx(k):start_idx(k)+num_held-1;
+    held_in=[1:(start_idx(k)-1) start_idx(k)+num_held:num_trials];
+    
+    [class,~,~,~,coeff] = classify(features(held_out,:), ...
+                                   features(held_in, :), ...
+                                   groups(held_in), 'linear');
+    
+    actual_states = groups(held_out);
+    
+    % Store number of correctly classified trials in each fold
+    correct(k) = sum(actual_states==class);
+end
+
+total_correct = sum(correct)
+DA = total_correct/num_trials * 100
+
+%% Plotting bandpower for held-in and held-out trials
+
+figure
+hold on
+
+% Specify fold number to plot
+fold_num = 17;
+held_out = start_idx(fold_num):start_idx(fold_num)+num_held-1;
+held_in=[1:(start_idx(fold_num)-1) start_idx(fold_num)+num_held:num_trials];
+
+gscatter(pow_a(held_out), pow_b(held_out), groups(held_out), 'br')
+gscatter(pow_a(held_in), pow_b(held_in), groups(held_in), 'br', 'o')
+K = coeff(1,2).const;
+L = coeff(1,2).linear; 
+f = @(x,y) K+L(1)*x + L(2)*y;
+h = fimplicit(f);
+set(h,'DisplayName','Decision Boundary', 'LineStyle','REPLACE_WITH_DASH_DASH', 'Color', 'k');
+
+xlabel('Mean alpha band power (dB/Hz rel. DC)')
+ylabel('Mean beta band power (dB/Hz rel. DC)')
+title("Mean power for Alpha vs. Beta bands (LDA Classifier)");
+axis(ax_range)
+
+
+%% Getting indices of two consecutive pairs of each state
+trial_num = 1;          % Trial number for pair (1 to 18)
+
+n = trial_num*2 - 1;    % Get trial number for "eyes closed" state
+nstart = (n-1)*trial_length+1;
+nstop = n*trial_length;
+
+closed_trial = signal(nstart:nstop);
+open_trial = signal((nstart:nstop) + trial_length);
+
+%% Plotting last two consecutive pairs of each state
+
+figure
+subplot(2,1,1)
+
+plot(time, closed_trial)
+yline(rms(closed_trial), 'rREPLACE_WITH_DASH_DASH')
+xlabel('Time (s)')
+ylabel('Voltage (µV)')
+title('Electrode voltage vs. time for eyes closed segment')
+legend('Electrode voltage', 'RMS voltage')
+axis([0 Tint min(signal) max(signal)])
+
+subplot(2,1,2)
+plot(time, open_trial)
+yline(rms(open_trial), 'rREPLACE_WITH_DASH_DASH')
+xlabel('Time (s)')
+ylabel('Voltage (µV)')
+title('Electrode voltage vs. time for eyes open segment')
+legend('Electrode voltage', 'RMS voltage')
+axis([0 Tint min(signal) max(signal)])
+
+##### SOURCE END #####
+--></body></html>
